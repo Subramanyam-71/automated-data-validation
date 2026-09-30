@@ -11,17 +11,26 @@ import mlflow
 mlflow.set_experiment("Automated Data Validation")
 
 
-# Start MLflow run
 with mlflow.start_run():
 
     # ==========================================
     # 1. LOAD DATA
     # ==========================================
-    train_df = pd.read_csv("data/train_data.csv")
-    incoming_df = pd.read_csv("data/incoming_data.csv")
+
+    train_df = pd.read_csv(
+        "data/train_data.csv",
+        sep=r"[\s,]+",
+        engine="python"
+    )
+
+    incoming_df = pd.read_csv(
+        "data/incoming_data.csv",
+        sep=r"[\s,]+",
+        engine="python"
+    )
 
     print("========================================")
-    print("     AUTOMATED DATA VALIDATION")
+    print("       AUTOMATED DATA VALIDATION")
     print("========================================")
 
 
@@ -56,7 +65,7 @@ with mlflow.start_run():
 
     print("\n[2] Checking Missing Values...")
 
-    missing_values = incoming_df.isnull().sum().sum()
+    missing_values = int(incoming_df.isnull().sum().sum())
 
     if missing_values == 0:
         print("✅ Missing value check PASSED")
@@ -74,7 +83,7 @@ with mlflow.start_run():
 
     print("\n[3] Checking Duplicate Records...")
 
-    duplicates = incoming_df.duplicated().sum()
+    duplicates = int(incoming_df.duplicated().sum())
 
     if duplicates == 0:
         print("✅ Duplicate check PASSED")
@@ -108,12 +117,33 @@ with mlflow.start_run():
             (data[column] > upper_bound)
         ]
 
+        if len(outliers) > 0:
+            print(f"\nPotential outliers in {column}:")
+
+            for _, row in outliers.iterrows():
+                print(
+                    f"Customer ID: {row['customer_id']} "
+                    f"| {column}: {row[column]}"
+                )
+
         return len(outliers)
 
 
-    age_outliers = check_outliers(incoming_df, "age")
-    income_outliers = check_outliers(incoming_df, "income")
-    score_outliers = check_outliers(incoming_df, "spending_score")
+    age_outliers = check_outliers(
+        incoming_df,
+        "age"
+    )
+
+    income_outliers = check_outliers(
+        incoming_df,
+        "income"
+    )
+
+    score_outliers = check_outliers(
+        incoming_df,
+        "spending_score"
+    )
+
 
     total_outliers = (
         age_outliers
@@ -121,13 +151,20 @@ with mlflow.start_run():
         + score_outliers
     )
 
+
     if total_outliers == 0:
-        print("✅ Outlier check PASSED")
+
+        print("\n✅ Outlier check PASSED")
         outlier_passed = True
 
     else:
-        print("❌ Outlier check FAILED")
-        print(f"Found {total_outliers} potential outlier value(s)")
+
+        print("\n❌ Outlier check FAILED")
+        print(
+            f"Found {total_outliers} "
+            f"potential outlier value(s)"
+        )
+
         outlier_passed = False
 
 
@@ -145,6 +182,7 @@ with mlflow.start_run():
         "spending_score"
     ]
 
+
     for column in columns_to_check:
 
         statistic, p_value = ks_2samp(
@@ -152,16 +190,25 @@ with mlflow.start_run():
             incoming_df[column]
         )
 
-        print(f"{column}: p-value = {p_value:.4f}")
+        print(
+            f"{column}: "
+            f"p-value = {p_value:.4f}"
+        )
 
-        # p-value < 0.05 means significant distribution change
         if p_value < 0.05:
-            print(f"❌ Distribution change detected in {column}")
+
+            print(
+                f"❌ Distribution change "
+                f"detected in {column}"
+            )
+
             distribution_passed = False
 
 
     if distribution_passed:
+
         print("✅ Distribution check PASSED")
+
 
     # ==========================================
     # 7. FINAL DATA QUALITY GATE
@@ -172,49 +219,82 @@ with mlflow.start_run():
     print("       DATA QUALITY GATE RESULT")
     print("========================================")
 
-    print(f"Schema Validation       : {'PASSED' if schema_passed else 'FAILED'}")
-    print(f"Missing Values          : {'PASSED' if missing_passed else 'FAILED'}")
-    print(f"Duplicate Records       : {'PASSED' if duplicate_passed else 'FAILED'}")
-    print(f"Outlier Detection       : {'PASSED' if outlier_passed else 'FAILED'}")
-    print(f"Distribution Check      : {'PASSED' if distribution_passed else 'FAILED'}")
-
-    all_checks_passed = (
-            schema_passed
-            and missing_passed
-            and duplicate_passed
-            and outlier_passed
-            and distribution_passed
+    print(
+        f"Schema Validation       : "
+        f"{'PASSED' if schema_passed else 'FAILED'}"
     )
 
+    print(
+        f"Missing Values          : "
+        f"{'PASSED' if missing_passed else 'FAILED'}"
+    )
+
+    print(
+        f"Duplicate Records       : "
+        f"{'PASSED' if duplicate_passed else 'FAILED'}"
+    )
+
+    print(
+        f"Outlier Detection       : "
+        f"{'PASSED' if outlier_passed else 'FAILED'}"
+    )
+
+    print(
+        f"Distribution Check      : "
+        f"{'PASSED' if distribution_passed else 'FAILED'}"
+    )
+
+
+    # ==========================================
+    # FINAL DECISION
+    # ==========================================
+
+    all_checks_passed = (
+        schema_passed
+        and missing_passed
+        and duplicate_passed
+        and outlier_passed
+        and distribution_passed
+    )
+
+
     print("----------------------------------------")
+
 
     if all_checks_passed:
 
         print("✅ DATA QUALITY GATE PASSED")
-        print("✅ Dataset is allowed to enter the ML pipeline.")
+        print(
+            "✅ Dataset is allowed to enter "
+            "the ML pipeline."
+        )
 
     else:
 
         print("❌ DATA QUALITY GATE FAILED")
-        print("❌ Dataset is BLOCKED from entering the ML pipeline.")
+        print(
+            "❌ Dataset is BLOCKED from entering "
+            "the ML pipeline."
+        )
+
 
     # ==========================================
-    # 8. MLflow LOGGING
+    # 8. MLFLOW LOGGING
     # ==========================================
 
     mlflow.log_metric(
         "missing_values",
-        int(missing_values)
+        missing_values
     )
 
     mlflow.log_metric(
         "duplicate_records",
-        int(duplicates)
+        duplicates
     )
 
     mlflow.log_metric(
         "outliers",
-        int(total_outliers)
+        total_outliers
     )
 
     mlflow.log_metric(
@@ -231,6 +311,7 @@ with mlflow.start_run():
         "validation_tool",
         "Pandera"
     )
+
 
     print("========================================")
     print("MLflow tracking completed.")
