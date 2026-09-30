@@ -163,33 +163,40 @@ with mlflow.start_run():
     if distribution_passed:
         print("✅ Distribution check PASSED")
 
-
     # ==========================================
     # 7. FINAL DATA QUALITY GATE
     # ==========================================
 
-    print("\n========================================")
-    print("             FINAL RESULT")
+    print("\n")
+    print("========================================")
+    print("       DATA QUALITY GATE RESULT")
     print("========================================")
 
+    print(f"Schema Validation       : {'PASSED' if schema_passed else 'FAILED'}")
+    print(f"Missing Values          : {'PASSED' if missing_passed else 'FAILED'}")
+    print(f"Duplicate Records       : {'PASSED' if duplicate_passed else 'FAILED'}")
+    print(f"Outlier Detection       : {'PASSED' if outlier_passed else 'FAILED'}")
+    print(f"Distribution Check      : {'PASSED' if distribution_passed else 'FAILED'}")
+
     all_checks_passed = (
-        schema_passed
-        and missing_passed
-        and duplicate_passed
-        and outlier_passed
-        and distribution_passed
+            schema_passed
+            and missing_passed
+            and duplicate_passed
+            and outlier_passed
+            and distribution_passed
     )
+
+    print("----------------------------------------")
 
     if all_checks_passed:
 
-        print("✅ DATA VALIDATION PASSED")
-        print("Dataset is allowed to enter the ML pipeline.")
+        print("✅ DATA QUALITY GATE PASSED")
+        print("✅ Dataset is allowed to enter the ML pipeline.")
 
     else:
 
-        print("❌ DATA VALIDATION FAILED")
-        print("Dataset is BLOCKED from entering the ML pipeline.")
-
+        print("❌ DATA QUALITY GATE FAILED")
+        print("❌ Dataset is BLOCKED from entering the ML pipeline.")
 
     # ==========================================
     # 8. MLflow LOGGING
