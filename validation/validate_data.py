@@ -1,179 +1,230 @@
 import pandas as pd
 import pandera.pandas as pa
 from scipy.stats import ks_2samp
+import mlflow
 
 
 # ==========================================
-# 1. LOAD DATA
+# MLflow SETUP
 # ==========================================
 
-train_df = pd.read_csv("../data/train_data.csv")
-incoming_df = pd.read_csv("../data/incoming_data.csv")
-
-print("========================================")
-print("     AUTOMATED DATA VALIDATION")
-print("========================================")
+mlflow.set_experiment("Automated Data Validation")
 
 
-# ==========================================
-# 2. SCHEMA VALIDATION
-# ==========================================
+# Start MLflow run
+with mlflow.start_run():
 
-print("\n[1] Checking Schema...")
+    # ==========================================
+    # 1. LOAD DATA
+    # ==========================================
+    train_df = pd.read_csv("data/train_data.csv")
+    incoming_df = pd.read_csv("data/incoming_data.csv")
 
-schema = pa.DataFrameSchema({
-    "customer_id": pa.Column(int),
-    "age": pa.Column(int),
-    "income": pa.Column(int),
-    "spending_score": pa.Column(int)
-})
-
-schema_passed = True
-
-try:
-    schema.validate(incoming_df)
-    print("✅ Schema validation PASSED")
-
-except pa.errors.SchemaError as e:
-    print("❌ Schema validation FAILED")
-    print(e)
-    schema_passed = False
+    print("========================================")
+    print("     AUTOMATED DATA VALIDATION")
+    print("========================================")
 
 
-# ==========================================
-# 3. MISSING VALUE CHECK
-# ==========================================
+    # ==========================================
+    # 2. SCHEMA VALIDATION
+    # ==========================================
 
-print("\n[2] Checking Missing Values...")
+    print("\n[1] Checking Schema...")
 
-missing_values = incoming_df.isnull().sum().sum()
+    schema = pa.DataFrameSchema({
+        "customer_id": pa.Column(int),
+        "age": pa.Column(int),
+        "income": pa.Column(int),
+        "spending_score": pa.Column(int)
+    })
 
-if missing_values == 0:
-    print("✅ Missing value check PASSED")
-    missing_passed = True
+    schema_passed = True
 
-else:
-    print(f"❌ Missing value check FAILED")
-    print(f"Found {missing_values} missing value(s)")
-    missing_passed = False
+    try:
+        schema.validate(incoming_df)
+        print("✅ Schema validation PASSED")
 
-
-# ==========================================
-# 4. DUPLICATE CHECK
-# ==========================================
-
-print("\n[3] Checking Duplicate Records...")
-
-duplicates = incoming_df.duplicated().sum()
-
-if duplicates == 0:
-    print("✅ Duplicate check PASSED")
-    duplicate_passed = True
-
-else:
-    print("❌ Duplicate check FAILED")
-    print(f"Found {duplicates} duplicate record(s)")
-    duplicate_passed = False
+    except pa.errors.SchemaError as e:
+        print("❌ Schema validation FAILED")
+        print(e)
+        schema_passed = False
 
 
-# ==========================================
-# 5. OUTLIER CHECK
-# ==========================================
+    # ==========================================
+    # 3. MISSING VALUE CHECK
+    # ==========================================
 
-print("\n[4] Checking Outliers...")
+    print("\n[2] Checking Missing Values...")
 
+    missing_values = incoming_df.isnull().sum().sum()
 
-def check_outliers(data, column):
+    if missing_values == 0:
+        print("✅ Missing value check PASSED")
+        missing_passed = True
 
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-
-    IQR = Q3 - Q1
-
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-
-    outliers = data[
-        (data[column] < lower_bound) |
-        (data[column] > upper_bound)
-    ]
-
-    return len(outliers)
+    else:
+        print("❌ Missing value check FAILED")
+        print(f"Found {missing_values} missing value(s)")
+        missing_passed = False
 
 
-age_outliers = check_outliers(incoming_df, "age")
-income_outliers = check_outliers(incoming_df, "income")
-score_outliers = check_outliers(incoming_df, "spending_score")
+    # ==========================================
+    # 4. DUPLICATE CHECK
+    # ==========================================
 
-total_outliers = age_outliers + income_outliers + score_outliers
+    print("\n[3] Checking Duplicate Records...")
 
-if total_outliers == 0:
-    print("✅ Outlier check PASSED")
-    outlier_passed = True
+    duplicates = incoming_df.duplicated().sum()
 
-else:
-    print("❌ Outlier check FAILED")
-    print(f"Found {total_outliers} potential outlier value(s)")
-    outlier_passed = False
+    if duplicates == 0:
+        print("✅ Duplicate check PASSED")
+        duplicate_passed = True
+
+    else:
+        print("❌ Duplicate check FAILED")
+        print(f"Found {duplicates} duplicate record(s)")
+        duplicate_passed = False
 
 
-# ==========================================
-# 6. DISTRIBUTION CHANGE CHECK
-# ==========================================
+    # ==========================================
+    # 5. OUTLIER CHECK
+    # ==========================================
 
-print("\n[5] Checking Distribution Changes...")
+    print("\n[4] Checking Outliers...")
 
-distribution_passed = True
 
-columns_to_check = [
-    "age",
-    "income",
-    "spending_score"
-]
+    def check_outliers(data, column):
 
-for column in columns_to_check:
+        Q1 = data[column].quantile(0.25)
+        Q3 = data[column].quantile(0.75)
 
-    statistic, p_value = ks_2samp(
-        train_df[column],
-        incoming_df[column]
+        IQR = Q3 - Q1
+
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+
+        outliers = data[
+            (data[column] < lower_bound) |
+            (data[column] > upper_bound)
+        ]
+
+        return len(outliers)
+
+
+    age_outliers = check_outliers(incoming_df, "age")
+    income_outliers = check_outliers(incoming_df, "income")
+    score_outliers = check_outliers(incoming_df, "spending_score")
+
+    total_outliers = (
+        age_outliers
+        + income_outliers
+        + score_outliers
     )
 
-    print(f"{column}: p-value = {p_value:.4f}")
+    if total_outliers == 0:
+        print("✅ Outlier check PASSED")
+        outlier_passed = True
 
-    # p-value < 0.05 means significant distribution change
-    if p_value < 0.05:
-        print(f"❌ Distribution change detected in {column}")
-        distribution_passed = False
-
-
-if distribution_passed:
-    print("✅ Distribution check PASSED")
+    else:
+        print("❌ Outlier check FAILED")
+        print(f"Found {total_outliers} potential outlier value(s)")
+        outlier_passed = False
 
 
-# ==========================================
-# 7. FINAL DATA QUALITY GATE
-# ==========================================
+    # ==========================================
+    # 6. DISTRIBUTION CHANGE CHECK
+    # ==========================================
 
-print("\n========================================")
-print("             FINAL RESULT")
-print("========================================")
+    print("\n[5] Checking Distribution Changes...")
 
-all_checks_passed = (
-    schema_passed
-    and missing_passed
-    and duplicate_passed
-    and outlier_passed
-    and distribution_passed
-)
+    distribution_passed = True
 
-if all_checks_passed:
+    columns_to_check = [
+        "age",
+        "income",
+        "spending_score"
+    ]
 
-    print("✅ DATA VALIDATION PASSED")
-    print("Dataset is allowed to enter the ML pipeline.")
+    for column in columns_to_check:
 
-else:
+        statistic, p_value = ks_2samp(
+            train_df[column],
+            incoming_df[column]
+        )
 
-    print("❌ DATA VALIDATION FAILED")
-    print("Dataset is BLOCKED from entering the ML pipeline.")
+        print(f"{column}: p-value = {p_value:.4f}")
 
-print("========================================")
+        # p-value < 0.05 means significant distribution change
+        if p_value < 0.05:
+            print(f"❌ Distribution change detected in {column}")
+            distribution_passed = False
+
+
+    if distribution_passed:
+        print("✅ Distribution check PASSED")
+
+
+    # ==========================================
+    # 7. FINAL DATA QUALITY GATE
+    # ==========================================
+
+    print("\n========================================")
+    print("             FINAL RESULT")
+    print("========================================")
+
+    all_checks_passed = (
+        schema_passed
+        and missing_passed
+        and duplicate_passed
+        and outlier_passed
+        and distribution_passed
+    )
+
+    if all_checks_passed:
+
+        print("✅ DATA VALIDATION PASSED")
+        print("Dataset is allowed to enter the ML pipeline.")
+
+    else:
+
+        print("❌ DATA VALIDATION FAILED")
+        print("Dataset is BLOCKED from entering the ML pipeline.")
+
+
+    # ==========================================
+    # 8. MLflow LOGGING
+    # ==========================================
+
+    mlflow.log_metric(
+        "missing_values",
+        int(missing_values)
+    )
+
+    mlflow.log_metric(
+        "duplicate_records",
+        int(duplicates)
+    )
+
+    mlflow.log_metric(
+        "outliers",
+        int(total_outliers)
+    )
+
+    mlflow.log_metric(
+        "validation_passed",
+        1 if all_checks_passed else 0
+    )
+
+    mlflow.log_param(
+        "dataset",
+        "incoming_data.csv"
+    )
+
+    mlflow.log_param(
+        "validation_tool",
+        "Pandera"
+    )
+
+    print("========================================")
+    print("MLflow tracking completed.")
+    print("========================================")
